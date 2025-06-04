@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <div class="text-center mb-4">
+                <i class="fab fa-instagram fa-3x mb-3" style="background: -webkit-linear-gradient(#405de6, #fd1d1d); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                <h2>Instagram Follower Analyzer</h2>
+                <p class="text-muted">Find out who doesn't follow you back</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('index') }}">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.username.label(class="form-label") }}
+                    {{ form.username(class="form-control", placeholder="Enter your Instagram username") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control", placeholder="Enter your Instagram password") }}
+                </div>
+                <div class="d-grid">
+                    {{ form.submit(class="btn btn-primary gradient-custom") }}
+                </div>
+            </form>
+
+            <div class="mt-4">
+                <div class="alert alert-info" role="alert">
+                    <h5 class="alert-heading"><i class="fas fa-shield-alt"></i> Security Note</h5>
+                    <p class="mb-0">Your credentials are only used to access Instagram's API and are never stored. This application runs locally on your machine.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

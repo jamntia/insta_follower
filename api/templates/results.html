@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class="fas fa-user-times text-danger me-2"></i>
+                    Non-Followers Summary
+                </h3>
+                <p class="card-text">
+                    Found <span class="badge bg-danger">{{ total }}</span> accounts that don't follow you back
+                </p>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-redo me-2"></i>New Analysis
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% for user_id, user in non_followers.items() %}
+    <div class="col">
+        <div class="card h-100 profile-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <img src="{{ user.profile_pic_url }}" alt="{{ user.username }}" class="profile-pic me-3">
+                    <div>
+                        <h5 class="card-title mb-1">{{ user.username }}</h5>
+                        <p class="card-subtitle text-muted mb-0">{{ user.full_name }}</p>
+                    </div>
+                </div>
+                <a href="https://instagram.com/{{ user.username }}" target="_blank" class="btn btn-outline-primary btn-sm w-100">
+                    <i class="fab fa-instagram me-2"></i>View Profile
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 
