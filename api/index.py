@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
@@ -6,11 +6,45 @@ import os
 from dotenv import load_dotenv
 from instagrapi import Client
 import json
+from functools import wraps
+from datetime import datetime, timedelta
+from collections import defaultdict
+import tempfile
 
 app = Flask(__name__)
-# For Vercel, we'll use a static secret key
-app.secret_key = 'your-secret-key-here'  # Replace with a secure secret key
+# Get secret key from environment variable or use a default for development
+app.secret_key = os.getenv('SECRET_KEY', 'dev-key-change-this')
 load_dotenv()
+
+# Simple rate limiting
+RATE_LIMIT_MINUTES = 5
+MAX_REQUESTS_PER_IP = 3
+ip_request_counts = defaultdict(list)
+
+def rate_limit():
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            ip = request.remote_addr
+            now = datetime.now()
+            
+            # Remove old requests
+            ip_request_counts[ip] = [
+                timestamp for timestamp in ip_request_counts[ip]
+                if timestamp > now - timedelta(minutes=RATE_LIMIT_MINUTES)
+            ]
+            
+            # Check if rate limit is exceeded
+            if len(ip_request_counts[ip]) >= MAX_REQUESTS_PER_IP:
+                flash('Rate limit exceeded. Please try again later.', 'error')
+                return redirect(url_for('index'))
+            
+            # Add current request
+            ip_request_counts[ip].append(now)
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 class LoginForm(FlaskForm):
     username = StringField('Instagram Username', validators=[DataRequired()])
@@ -18,38 +52,48 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Analyze Followers')
 
 def get_instagram_data(username, password):
-    cl = Client()
-    try:
-        cl.login(username, password)
-        user_id = cl.user_id
+    # Create a temporary directory for Instagram client settings
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cl = Client()
+        cl.settings = {
+            "uuids": {},
+            "cookies": {},
+            "device_settings": {},
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 239.2.0.17.109 (iPhone13,3; iOS 15_5; en_US; en-US; scale=3.00; 1170x2532; 376668393)"
+        }
         
-        # Get followers and following
-        followers = cl.user_followers(user_id)
-        following = cl.user_following(user_id)
-        
-        # Find users you follow who don't follow you back
-        non_followers = {
-            str(user_id): {
-                "username": user_info.username,
-                "full_name": user_info.full_name,
-                "profile_pic_url": user_info.profile_pic_url
+        try:
+            cl.login(username, password)
+            user_id = cl.user_id
+            
+            # Get followers and following
+            followers = cl.user_followers(user_id)
+            following = cl.user_following(user_id)
+            
+            # Find users you follow who don't follow you back
+            non_followers = {
+                str(user_id): {
+                    "username": user_info.username,
+                    "full_name": user_info.full_name,
+                    "profile_pic_url": user_info.profile_pic_url
+                }
+                for user_id, user_info in following.items()
+                if user_id not in followers
             }
-            for user_id, user_info in following.items()
-            if user_id not in followers
-        }
-        
-        return {
-            "success": True,
-            "data": non_followers,
-            "total": len(non_followers)
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+            
+            return {
+                "success": True,
+                "data": non_followers,
+                "total": len(non_followers)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 @app.route('/', methods=['GET', 'POST'])
+@rate_limit()
 def index():
     form = LoginForm()
     if form.validate_on_submit():
